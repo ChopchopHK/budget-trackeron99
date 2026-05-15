@@ -409,27 +409,72 @@ function updateTotals() {
   document.getElementById('tot-household').textContent = '£' + t.household.toFixed(2);
 }
 
-function entryHTML(r) {
-  const [date, who, cat, amt] = r;
-  return `<div class="entry-item">
-    <div class="dot ${esc(cat)}"></div>
+function entryHTML(r, realIndex) {
+  const [date, who, desc, amt, acc] = r;
+  const dot = acc || desc;
+  return `<div class="entry-item" id="row-${realIndex}">
+    <div class="dot ${esc(dot)}"></div>
     <div class="entry-info">
-      <div class="entry-cat">${esc(cat)}</div>
-      <div class="entry-meta">${esc(who)} · ${esc(date)}</div>
+      <div class="entry-cat">${esc(desc||'')}</div>
+      <div class="entry-meta">${esc(who)} · ${esc(date)} · <span style="color:var(--muted)">${esc(acc||'')}</span></div>
     </div>
-    <div class="entry-amt">£${parseFloat(amt||0).toFixed(2)}</div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <div class="entry-amt">£${parseFloat(amt||0).toFixed(2)}</div>
+      <button onclick="deleteRow(${realIndex})" style="background:none;border:none;font-size:16px;cursor:pointer;padding:4px;color:var(--muted);">🗑️</button>
+    </div>
   </div>`;
 }
 
 function renderRecent() {
   const el = document.getElementById('recent-list');
+  const total = cachedRows.length;
   const rows = cachedRows.slice(-10).reverse();
-  el.innerHTML = rows.length ? rows.map(entryHTML).join('') : '<div class="empty-state">No entries yet</div>';
+  el.innerHTML = rows.length ? rows.map((r, i) => entryHTML(r, total - 1 - i)).join('') : '<div class="empty-state">No entries yet</div>';
 }
 
 function renderAll() {
   const el = document.getElementById('all-list');
-  el.innerHTML = cachedRows.length ? cachedRows.slice().reverse().map(entryHTML).join('') : '<div class="empty-state">No entries yet</div>';
+  const total = cachedRows.length;
+  el.innerHTML = total ? cachedRows.slice().reverse().map((r, i) => entryHTML(r, total - 1 - i)).join('') : '<div class="empty-state">No entries yet</div>';
+}
+
+async function deleteRow(index) {
+  if (!confirm('Delete this entry?')) return;
+  try {
+    const token = await getToken();
+    // Get spreadsheet metadata to find the real sheetId
+    const meta = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${CFG.sid}?fields=sheets.properties`, {
+      headers: { Authorization: 'Bearer ' + token }
+    });
+    const metaData = await meta.json();
+    const tabName = CFG.tab || 'Sheet1';
+    const sheet = metaData.sheets.find(s => s.properties.title === tabName);
+    const sheetId = sheet ? sheet.properties.sheetId : 0;
+
+    const body = {
+      requests: [{
+        deleteDimension: {
+          range: {
+            sheetId,
+            dimension: 'ROWS',
+            startIndex: index + 1, // +1 for header row
+            endIndex: index + 2
+          }
+        }
+      }]
+    };
+    const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${CFG.sid}:batchUpdate`, {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    if (!res.ok) throw new Error(await res.text());
+    cachedRows.splice(index, 1);
+    updateTotals(); renderRecent(); renderAll();
+    showToast('Deleted ✓');
+  } catch(e) {
+    showToast('Delete failed: ' + e.message.slice(0,50));
+  }
 }
 
 function reconcile() {
