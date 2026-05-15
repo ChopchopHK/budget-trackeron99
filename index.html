@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Budget</title>
+<style>
+  :root {
+    --bg: #f5f5f3;
+    --surface: #ffffff;
+    --border: #e0ddd8;
+    --text: #1a1a18;
+    --muted: #888780;
+    --coffee: #f5c242;
+    --coffee-dark: #3a2800;
+    --airbnb: #3ecfa0;
+    --airbnb-dark: #04342c;
+    --household: #5aa8f0;
+    --household-dark: #042c53;
+    --danger: #e24b4a;
+    --success: #3ecfa0;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  #config-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 2rem 1rem; }
+  #config-screen h1 { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
+  #config-screen p { font-size: 14px; color: var(--muted); margin-bottom: 2rem; text-align: center; max-width: 320px; }
+  .config-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 1.5rem; width: 100%; max-width: 400px; }
+  .fl { display: block; font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 5px; margin-top: 16px; }
+  .fl:first-child { margin-top: 0; }
+  .config-card input, .config-card textarea { width: 100%; padding: 11px 13px; border: 1px solid var(--border); border-radius: 10px; font-size: 14px; color: var(--text); background: var(--bg); }
+  .config-card textarea { font-family: monospace; font-size: 12px; min-height: 90px; resize: vertical; }
+  .hint { font-size: 11px; color: var(--muted); margin-top: 4px; line-height: 1.4; }
+  .name-row { display: flex; gap: 8px; }
+  .name-row input { flex: 1; }
+  .big-btn { width: 100%; margin-top: 1.25rem; padding: 14px; background: var(--text); color: #fff; border: none; border-radius: 12px; font-size: 16px; font-weight: 700; cursor: pointer; }
+
+  #app { display: none; max-width: 480px; margin: 0 auto; padding-bottom: 80px; }
+
+  .header { padding: 1rem 1rem 0.5rem; display: flex; justify-content: space-between; align-items: center; }
+  .header h1 { font-size: 20px; font-weight: 700; }
+  .who-toggle { display: flex; background: var(--border); border-radius: 20px; padding: 3px; gap: 2px; }
+  .who-toggle button { padding: 5px 16px; border: none; border-radius: 16px; font-size: 13px; font-weight: 600; cursor: pointer; background: transparent; color: var(--muted); }
+  .who-toggle button.active { background: var(--surface); color: var(--text); }
+  .gear { background: none; border: 1px solid var(--border); border-radius: 8px; padding: 5px 9px; font-size: 15px; cursor: pointer; }
+
+  .totals { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; padding: 0.5rem 1rem 0.75rem; }
+  .tot { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 9px 10px; }
+  .tot-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin-bottom: 3px; }
+  .tot-amt { font-size: 17px; font-weight: 800; }
+  .tot.coffee .tot-amt { color: #b07800; }
+  .tot.airbnb .tot-amt { color: #0f6e56; }
+  .tot.household .tot-amt { color: #185fa5; }
+
+  .quick-box { margin: 0 1rem 0.75rem; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 1rem; }
+  .quick-input-row { display: flex; gap: 8px; align-items: center; }
+  .quick-input { flex: 1; font-size: 20px; font-weight: 600; border: none; background: transparent; color: var(--text); outline: none; padding: 4px 0; }
+  .quick-input::placeholder { color: var(--border); font-weight: 400; font-size: 18px; }
+  .send-btn { width: 44px; height: 44px; border-radius: 12px; background: var(--text); border: none; color: #fff; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .send-btn:active { opacity: 0.8; transform: scale(0.95); }
+  .send-btn.loading { opacity: 0.5; pointer-events: none; }
+
+  /* CAT OVERRIDE PILLS */
+  .cat-override { display: flex; gap: 6px; margin-top: 10px; }
+  .cat-pill { padding: 5px 12px; border-radius: 20px; border: 1.5px solid var(--border); font-size: 12px; font-weight: 600; cursor: pointer; background: transparent; color: var(--muted); }
+  .cat-pill.sel-coffee { background: var(--coffee); border-color: var(--coffee); color: var(--coffee-dark); }
+  .cat-pill.sel-airbnb { background: var(--airbnb); border-color: var(--airbnb); color: var(--airbnb-dark); }
+  .cat-pill.sel-household { background: var(--household); border-color: var(--household); color: var(--household-dark); }
+
+  .parsed-preview { margin-top: 10px; font-size: 13px; color: var(--muted); min-height: 18px; display: flex; align-items: center; gap: 6px; }
+  .tag { display: inline-block; padding: 2px 9px; border-radius: 10px; font-size: 12px; font-weight: 700; }
+  .tag.coffee { background: var(--coffee); color: var(--coffee-dark); }
+  .tag.airbnb { background: var(--airbnb); color: var(--airbnb-dark); }
+  .tag.household { background: var(--household); color: var(--household-dark); }
+
+  .section-head { display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 1rem 0.4rem; }
+  .section-head h2 { font-size: 14px; font-weight: 700; }
+  .refresh-btn { font-size: 12px; color: var(--muted); border: 1px solid var(--border); border-radius: 8px; padding: 4px 10px; background: none; cursor: pointer; }
+
+  .entry-list { padding: 0 1rem; }
+  .entry-item { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .entry-item:last-child { border-bottom: none; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+  .dot.coffee { background: var(--coffee); }
+  .dot.airbnb { background: var(--airbnb); }
+  .dot.household { background: var(--household); }
+  .entry-info { flex: 1; min-width: 0; }
+  .entry-cat { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .entry-meta { font-size: 11px; color: var(--muted); margin-top: 1px; }
+  .entry-amt { font-size: 15px; font-weight: 800; flex-shrink: 0; }
+  .empty-state { text-align: center; padding: 2.5rem 1rem; color: var(--muted); font-size: 14px; }
+
+  .rec-wrap { padding: 0 1rem; }
+  .rec-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 1rem; margin-bottom: 10px; }
+  .rec-card input { width: 100%; padding: 11px 12px; border: 1px solid var(--border); border-radius: 10px; font-size: 18px; font-weight: 600; background: var(--bg); color: var(--text); margin-top: 6px; }
+  .rec-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+  .rec-item { background: var(--bg); border-radius: 10px; padding: 10px 12px; }
+  .rec-item .rl { font-size: 11px; color: var(--muted); margin-bottom: 2px; }
+  .rec-item .rv { font-size: 18px; font-weight: 800; }
+  .rv.neg { color: var(--danger); }
+  .rv.pos { color: #0f6e56; }
+
+  .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: var(--surface); border-top: 1px solid var(--border); display: flex; padding: 8px 0 max(8px, env(safe-area-inset-bottom)); max-width: 480px; margin: 0 auto; z-index: 10; }
+  .nav-btn { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 4px 0; background: none; border: none; cursor: pointer; }
+  .nav-icon { font-size: 20px; }
+  .nav-label { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  .nav-btn.active .nav-label { color: var(--text); }
+
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  .toast { position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%); background: var(--text); color: #fff; padding: 10px 20px; border-radius: 20px; font-size: 14px; font-weight: 600; display: none; z-index: 999; white-space: nowrap; }
+</style>
+</head>
+<body>
+
+<div id="config-screen">
+  <h1>💰 Budget Tracker</h1>
+  <p>One-time setup on each phone.</p>
+  <div class="config-card">
+    <span class="fl">Google Sheet ID</span>
+    <input type="text" id="cfg-sid" value="1yhnokb2sdRHFShBADaeduvx3gzm5JRpBCa225uWB4wU" />
+    <div class="hint">Already filled ↑</div>
+
+    <span class="fl">Sheet tab name</span>
+    <input type="text" id="cfg-tab" value="Sheet1" />
+
+    <span class="fl">Service Account JSON</span>
+    <textarea id="cfg-svc" placeholder='Paste the full contents of your .json key file'></textarea>
+
+    <span class="fl">Which account is this phone logging for?</span>
+    <div style="display:flex;gap:8px;margin-top:6px;">
+      <button id="abtn-household" onclick="pickAccount('household')" style="flex:1;padding:11px 4px;border:1.5px solid var(--border);border-radius:12px;font-size:13px;font-weight:700;background:transparent;cursor:pointer;color:var(--text);">🛒 Household</button>
+      <button id="abtn-coffee" onclick="pickAccount('coffee')" style="flex:1;padding:11px 4px;border:1.5px solid var(--border);border-radius:12px;font-size:13px;font-weight:700;background:transparent;cursor:pointer;color:var(--text);">☕ Coffee biz</button>
+      <button id="abtn-airbnb" onclick="pickAccount('airbnb')" style="flex:1;padding:11px 4px;border:1.5px solid var(--border);border-radius:12px;font-size:13px;font-weight:700;background:transparent;cursor:pointer;color:var(--text);">🏠 Airbnb</button>
+    </div>
+
+    <span class="fl">Who are you on this phone?</span>
+    <div style="display:flex;gap:10px;margin-top:6px;">
+      <button id="pbtn-1" onclick="pickWho(1)" style="flex:1;padding:14px;border:1.5px solid var(--border);border-radius:12px;font-size:16px;font-weight:700;background:transparent;cursor:pointer;color:var(--text);">Adrienne</button>
+      <button id="pbtn-2" onclick="pickWho(2)" style="flex:1;padding:14px;border:1.5px solid var(--border);border-radius:12px;font-size:16px;font-weight:700;background:transparent;cursor:pointer;color:var(--text);">Wing</button>
+    </div>
+
+    <button class="big-btn" onclick="saveConfig()">Open App →</button>
+  </div>
+</div>
+
+<div id="app">
+  <div class="header">
+    <h1>💰 Budget</h1>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <div class="who-toggle">
+        <button class="active" id="wb1" onclick="setWho(1)">Adrienne</button>
+        <button id="wb2" onclick="setWho(2)">Wing</button>
+      </div>
+      <button class="gear" onclick="openSettings()">⚙️</button>
+    </div>
+  </div>
+
+  <div class="totals">
+    <div class="tot coffee"><div class="tot-label">☕ Coffee biz</div><div class="tot-amt" id="tot-coffee">£0</div></div>
+    <div class="tot airbnb"><div class="tot-label">🏠 Airbnb</div><div class="tot-amt" id="tot-airbnb">£0</div></div>
+    <div class="tot household"><div class="tot-label">🛒 Household</div><div class="tot-amt" id="tot-household">£0</div></div>
+  </div>
+
+  <div class="tab-panel active" id="tab-log">
+    <div class="quick-box">
+      <div class="quick-input-row">
+        <input class="quick-input" id="qinput" type="text" placeholder="tesco 12" autocomplete="off" autocorrect="off" spellcheck="false" />
+        <button class="send-btn" id="send-btn" onclick="handleSend()">↑</button>
+      </div>
+
+      <!-- Manual category override -->
+      <div class="cat-override">
+        <button class="cat-pill" id="pill-household" data-cat="household" onclick="overrideCat('household')">🛒 Household</button>
+        <button class="cat-pill" id="pill-coffee" data-cat="coffee" onclick="overrideCat('coffee')">☕ Coffee biz</button>
+        <button class="cat-pill" id="pill-airbnb" data-cat="airbnb" onclick="overrideCat('airbnb')">🏠 Airbnb</button>
+      </div>
+
+      <div class="parsed-preview" id="preview"></div>
+    </div>
+
+    <div class="section-head">
+      <h2>Recent</h2>
+      <button class="refresh-btn" onclick="loadEntries()">↻ Refresh</button>
+    </div>
+    <div class="entry-list" id="recent-list"><div class="empty-state">Add your first entry above</div></div>
+  </div>
+
+  <div class="tab-panel" id="tab-entries">
+    <div class="section-head">
+      <h2>All entries</h2>
+      <button class="refresh-btn" onclick="loadEntries()">↻ Refresh</button>
+    </div>
+    <div class="entry-list" id="all-list"><div class="empty-state">Loading...</div></div>
+  </div>
+
+  <div class="tab-panel" id="tab-reconcile">
+    <div class="section-head"><h2>Monthly reconcile</h2></div>
+    <div class="rec-wrap">
+      <div class="rec-card">
+        <span class="fl">CC statement total (£)</span>
+        <input type="number" id="cc-total" placeholder="0.00" step="0.01" />
+        <span class="fl" style="margin-top:12px;">Bank pot balance (£)</span>
+        <input type="number" id="bank-bal" placeholder="0.00" step="0.01" />
+        <button class="big-btn" style="margin-top:12px;" onclick="reconcile()">Calculate</button>
+        <div class="rec-grid" id="rec-grid" style="display:none;"></div>
+      </div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.6;">CC statement = source of truth. Gap = what you missed logging. Pot = what's left after paying CC.</div>
+    </div>
+  </div>
+
+  <div class="bottom-nav">
+    <button class="nav-btn active" data-tab="log" onclick="switchTab(this)"><span class="nav-icon">✏️</span><span class="nav-label">Log</span></button>
+    <button class="nav-btn" data-tab="entries" onclick="switchTab(this)"><span class="nav-icon">📋</span><span class="nav-label">All</span></button>
+    <button class="nav-btn" data-tab="reconcile" onclick="switchTab(this)"><span class="nav-icon">⚖️</span><span class="nav-label">Reconcile</span></button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let setupAccount = 'household';
+
+function pickAccount(acc) {
+  setupAccount = acc;
+  const colors = { household: 'var(--household)', coffee: 'var(--coffee)', airbnb: 'var(--airbnb)' };
+  const textColors = { household: 'var(--household-dark)', coffee: 'var(--coffee-dark)', airbnb: 'var(--airbnb-dark)' };
+  ['household','coffee','airbnb'].forEach(a => {
+    const b = document.getElementById('abtn-' + a);
+    if (a === acc) { b.style.background = colors[a]; b.style.borderColor = colors[a]; b.style.color = textColors[a]; }
+    else { b.style.background = 'transparent'; b.style.borderColor = 'var(--border)'; b.style.color = 'var(--text)'; }
+  });
+}
+let whoIndex = 1; // 1 = Adrienne, 2 = Wing
+let setupWhoIndex = 1;
+let cachedRows = [];
+let manualCat = null;
+
+const NAMES = ['Adrienne', 'Wing'];
+
+function loadConfig() {
+  try { CFG = JSON.parse(localStorage.getItem('bgt_cfg4') || '{}'); } catch(e) { CFG = {}; }
+  if (CFG.sid && CFG.svcJson) {
+    applyConfig();
+    document.getElementById('config-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    loadEntries();
+  }
+}
+
+function pickWho(n) {
+  setupWhoIndex = n;
+  document.getElementById('pbtn-1').style.background = n === 1 ? 'var(--text)' : 'transparent';
+  document.getElementById('pbtn-1').style.color = n === 1 ? '#fff' : 'var(--text)';
+  document.getElementById('pbtn-2').style.background = n === 2 ? 'var(--text)' : 'transparent';
+  document.getElementById('pbtn-2').style.color = n === 2 ? '#fff' : 'var(--text)';
+}
+
+function saveConfig() {
+  const sid = document.getElementById('cfg-sid').value.trim();
+  const tab = document.getElementById('cfg-tab').value.trim() || 'Sheet1';
+  const raw = document.getElementById('cfg-svc').value.trim();
+  if (!raw) { showToast('Paste your service account JSON'); return; }
+  let svcJson;
+  try { svcJson = JSON.parse(raw); } catch(e) { showToast('Invalid JSON'); return; }
+  CFG = { sid, tab, svcJson, myIdx: setupWhoIndex, account: setupAccount };
+  localStorage.setItem('bgt_cfg4', JSON.stringify(CFG));
+  applyConfig();
+  document.getElementById('config-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  loadEntries();
+}
+
+function applyConfig() {
+  whoIndex = CFG.myIdx || 1;
+  document.getElementById('wb1').textContent = 'Adrienne';
+  document.getElementById('wb2').textContent = 'Wing';
+  updateWhoButtons();
+}
+
+function openSettings() {
+  document.getElementById('cfg-sid').value = CFG.sid || '';
+  document.getElementById('cfg-tab').value = CFG.tab || 'Sheet1';
+  document.getElementById('cfg-svc').value = CFG.svcJson ? JSON.stringify(CFG.svcJson) : '';
+  pickWho(CFG.myIdx || 1);
+  pickAccount(CFG.account || 'household');
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('config-screen').style.display = 'flex';
+}
+
+function setWho(n) { whoIndex = n; updateWhoButtons(); }
+function updateWhoButtons() {
+  document.getElementById('wb1').classList.toggle('active', whoIndex === 1);
+  document.getElementById('wb2').classList.toggle('active', whoIndex === 2);
+}
+function whoName() { return whoIndex === 1 ? 'Adrienne' : 'Wing'; }
+
+// ─── CATEGORY DETECTION ───────────────────────────────────────────────────────
+// Rules (in priority order):
+//   1. If manual override selected → use that
+//   2. Contains "coffee biz", "coffee business", "for coffee", "coffee shop biz" → coffee
+//   3. Contains "airbnb", "for airbnb", "air bnb" → airbnb
+//   4. Everything else → household (DEFAULT)
+
+function detectCat(text) {
+  if (manualCat) return manualCat;
+  const t = text.toLowerCase();
+  // Coffee biz signals — must be explicit about it being the business
+  if (/coffee\s*biz|coffee\s*business|for\s*(the\s*)?coffee|coffee\s*shop\s*biz|coffee\s*beans\s*for/.test(t)) return 'coffee';
+  // Airbnb signals
+  if (/airbnb|air\s*bnb|for\s*(the\s*)?airbnb|airbnb\s*biz/.test(t)) return 'airbnb';
+  // Everything else = household
+  return 'household';
+}
+
+function parseInput(raw) {
+  if (!raw.trim()) return null;
+  // Extract amount — last number in the string
+  const amtMatch = raw.trim().match(/(\d+\.?\d*)\s*$/);
+  if (!amtMatch) return null;
+  const amt = parseFloat(amtMatch[1]);
+  if (isNaN(amt) || amt <= 0) return null;
+  const descPart = raw.trim().slice(0, amtMatch.index).trim();
+  const cat = detectCat(descPart || raw);
+  return { cat, amt, desc: descPart };
+}
+
+// ─── MANUAL OVERRIDE ──────────────────────────────────────────────────────────
+function overrideCat(cat) {
+  if (manualCat === cat) {
+    manualCat = null; // toggle off
+  } else {
+    manualCat = cat;
+  }
+  // Update pill styles
+  ['household','coffee','airbnb'].forEach(c => {
+    const pill = document.getElementById('pill-' + c);
+    pill.className = 'cat-pill' + (manualCat === c ? ' sel-' + c : '');
+  });
+  updatePreview();
+}
+
+function clearOverride() {
+  manualCat = null;
+  ['household','coffee','airbnb'].forEach(c => {
+    document.getElementById('pill-' + c).className = 'cat-pill';
+  });
+}
+
+// ─── PREVIEW ──────────────────────────────────────────────────────────────────
+const qinput = document.getElementById('qinput');
+const preview = document.getElementById('preview');
+
+function updatePreview() {
+  const p = parseInput(qinput.value);
+  if (!p) { preview.innerHTML = ''; return; }
+  const src = manualCat ? 'manual' : 'auto';
+  preview.innerHTML = `<span class="tag ${p.cat}">${p.cat}</span> £${p.amt.toFixed(2)} · ${whoName()} · today <span style="font-size:11px;color:var(--muted);">(${src})</span>`;
+}
+
+qinput.addEventListener('input', updatePreview);
+qinput.addEventListener('keydown', e => { if (e.key === 'Enter') handleSend(); });
+
+// ─── SEND ─────────────────────────────────────────────────────────────────────
+async function handleSend() {
+  const raw = qinput.value.trim();
+  const p = parseInput(raw);
+  if (!p) { showToast('Type something then the amount, e.g. tesco 12'); return; }
+
+  const btn = document.getElementById('send-btn');
+  btn.classList.add('loading'); btn.textContent = '…';
+
+  try {
+    const today = new Date().toLocaleDateString('en-GB', { day:'2-digit', month:'2-digit', year:'2-digit' });
+    const row = [today, whoName(), p.cat, p.amt.toFixed(2)];
+    await appendRow(row);
+    cachedRows.push(row);
+    updateTotals();
+    renderRecent();
+    qinput.value = '';
+    preview.innerHTML = '';
+    clearOverride();
+    showToast('✓ Logged');
+  } catch(e) {
+    showToast('Error: ' + e.message.slice(0,60));
+  } finally {
+    btn.classList.remove('loading'); btn.textContent = '↑';
+  }
+}
+
+// ─── TABS ─────────────────────────────────────────────────────────────────────
+function switchTab(btn) {
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+  if (btn.dataset.tab === 'entries') renderAll();
+}
+
+// ─── RENDER ───────────────────────────────────────────────────────────────────
+function updateTotals() {
+  const t = { coffee: 0, airbnb: 0, household: 0 };
+  cachedRows.forEach(r => { const c = r[2]; const a = parseFloat(r[3]) || 0; if (t[c] !== undefined) t[c] += a; });
+  document.getElementById('tot-coffee').textContent = '£' + t.coffee.toFixed(2);
+  document.getElementById('tot-airbnb').textContent = '£' + t.airbnb.toFixed(2);
+  document.getElementById('tot-household').textContent = '£' + t.household.toFixed(2);
+}
+
+function entryHTML(r) {
+  const [date, who, cat, amt] = r;
+  return `<div class="entry-item">
+    <div class="dot ${esc(cat)}"></div>
+    <div class="entry-info">
+      <div class="entry-cat">${esc(cat)}</div>
+      <div class="entry-meta">${esc(who)} · ${esc(date)}</div>
+    </div>
+    <div class="entry-amt">£${parseFloat(amt||0).toFixed(2)}</div>
+  </div>`;
+}
+
+function renderRecent() {
+  const el = document.getElementById('recent-list');
+  const rows = cachedRows.slice(-10).reverse();
+  el.innerHTML = rows.length ? rows.map(entryHTML).join('') : '<div class="empty-state">No entries yet</div>';
+}
+
+function renderAll() {
+  const el = document.getElementById('all-list');
+  el.innerHTML = cachedRows.length ? cachedRows.slice().reverse().map(entryHTML).join('') : '<div class="empty-state">No entries yet</div>';
+}
+
+function reconcile() {
+  const cc = parseFloat(document.getElementById('cc-total').value) || 0;
+  const bank = parseFloat(document.getElementById('bank-bal').value) || 0;
+  const logged = cachedRows.reduce((s, r) => s + (parseFloat(r[3]) || 0), 0);
+  const gap = cc - logged;
+  const pot = bank - cc;
+  const grid = document.getElementById('rec-grid');
+  grid.style.display = 'grid';
+  grid.innerHTML = `
+    <div class="rec-item"><div class="rl">You logged</div><div class="rv">£${logged.toFixed(2)}</div></div>
+    <div class="rec-item"><div class="rl">CC statement</div><div class="rv">£${cc.toFixed(2)}</div></div>
+    <div class="rec-item"><div class="rl">Gap (missed)</div><div class="rv ${gap>0?'neg':'pos'}">£${Math.abs(gap).toFixed(2)} ${gap>0?'under':'over'}</div></div>
+    <div class="rec-item"><div class="rl">Pot remaining</div><div class="rv ${pot>=0?'pos':'neg'}">£${pot.toFixed(2)}</div></div>`;
+}
+
+// ─── SHEETS AUTH ──────────────────────────────────────────────────────────────
+async function getToken() {
+  const svc = CFG.svcJson;
+  const now = Math.floor(Date.now() / 1000);
+  const b64u = s => btoa(unescape(encodeURIComponent(JSON.stringify(s)))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+  const unsigned = b64u({alg:'RS256',typ:'JWT'}) + '.' + b64u({iss:svc.client_email,scope:'https://www.googleapis.com/auth/spreadsheets',aud:'https://oauth2.googleapis.com/token',exp:now+3600,iat:now});
+  const pemBody = svc.private_key.replace(/-----[^-]+-----/g,'').replace(/\s+/g,'');
+  const der = Uint8Array.from(atob(pemBody), c => c.charCodeAt(0));
+  const key = await crypto.subtle.importKey('pkcs8', der.buffer, {name:'RSASSA-PKCS1-v1_5',hash:'SHA-256'}, false, ['sign']);
+  const sig = await crypto.subtle.sign({name:'RSASSA-PKCS1-v1_5'}, key, new TextEncoder().encode(unsigned));
+  const jwt = unsigned + '.' + btoa(String.fromCharCode(...new Uint8Array(sig))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+  const res = await fetch('https://oauth2.googleapis.com/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:`grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=${jwt}`});
+  const data = await res.json();
+  if (!data.access_token) throw new Error('Auth failed — check service account JSON');
+  return data.access_token;
+}
+
+async function appendRow(row) {
+  const token = await getToken();
+  const range = encodeURIComponent((CFG.tab||'Sheet1') + '!A:D');
+  const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${CFG.sid}/values/${range}:append?valueInputOption=USER_ENTERED`,{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({values:[row]})});
+  if (!res.ok) throw new Error(await res.text());
+}
+
+async function readRows() {
+  const token = await getToken();
+  const range = encodeURIComponent((CFG.tab||'Sheet1') + '!A:D');
+  const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${CFG.sid}/values/${range}`,{headers:{Authorization:'Bearer '+token}});
+  const data = await res.json();
+  return (data.values||[]).slice(1);
+}
+
+async function loadEntries() {
+  try {
+    cachedRows = await readRows();
+    updateTotals(); renderRecent(); renderAll();
+  } catch(e) {
+    showToast('Load failed: ' + e.message.slice(0,50));
+  }
+}
+
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.style.display = 'block';
+  clearTimeout(t._t); t._t = setTimeout(() => t.style.display='none', 2500);
+}
+
+loadConfig();
+</script>
+</body>
+</html>
