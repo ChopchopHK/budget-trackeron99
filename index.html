@@ -374,7 +374,7 @@ async function handleSend() {
 
   try {
     const today = new Date().toLocaleDateString('en-GB', { day:'2-digit', month:'2-digit', year:'2-digit' });
-    const row = [today, whoName(), p.cat, p.amt.toFixed(2)];
+    const row = [today, whoName(), p.cat, p.amt.toFixed(2), CFG.account || 'household'];
     await appendRow(row);
     cachedRows.push(row);
     updateTotals();
@@ -465,14 +465,14 @@ async function getToken() {
 
 async function appendRow(row) {
   const token = await getToken();
-  const range = encodeURIComponent((CFG.tab||'Sheet1') + '!A:D');
+  const range = encodeURIComponent((CFG.tab||'Sheet1') + '!A:E');
   const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${CFG.sid}/values/${range}:append?valueInputOption=USER_ENTERED`,{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({values:[row]})});
   if (!res.ok) throw new Error(await res.text());
 }
 
 async function readRows() {
   const token = await getToken();
-  const range = encodeURIComponent((CFG.tab||'Sheet1') + '!A:D');
+  const range = encodeURIComponent((CFG.tab||'Sheet1') + '!A:E');
   const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${CFG.sid}/values/${range}`,{headers:{Authorization:'Bearer '+token}});
   const data = await res.json();
   return (data.values||[]).slice(1);
