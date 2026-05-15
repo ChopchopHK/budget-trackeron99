@@ -374,7 +374,8 @@ async function handleSend() {
 
   try {
     const today = new Date().toLocaleDateString('en-GB', { day:'2-digit', month:'2-digit', year:'2-digit' });
-    const row = [today, whoName(), p.cat, p.amt.toFixed(2), CFG.account || 'household'];
+    const descPart = p.desc || raw.trim().replace(/[\d.]+\s*$/, '').trim() || raw.trim();
+    const row = [today, whoName(), descPart, p.amt.toFixed(2), p.cat];
     await appendRow(row);
     cachedRows.push(row);
     updateTotals();
