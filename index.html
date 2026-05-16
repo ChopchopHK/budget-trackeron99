@@ -74,6 +74,10 @@
   .tag.airbnb { background: var(--airbnb); color: var(--airbnb-dark); }
   .tag.household { background: var(--household); color: var(--household-dark); }
 
+  .filter-bar { display:flex; gap:6px; padding: 0 1rem 0.75rem; flex-wrap:wrap; }
+  .filter-pill { padding:5px 14px; border-radius:20px; border:1.5px solid var(--border); font-size:12px; font-weight:600; cursor:pointer; background:transparent; color:var(--muted); }
+  .filter-pill.active { background:var(--text); border-color:var(--text); color:#fff; }
+
   .section-head { display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 1rem 0.4rem; }
   .section-head h2 { font-size: 14px; font-weight: 700; }
   .refresh-btn { font-size: 12px; color: var(--muted); border: 1px solid var(--border); border-radius: 8px; padding: 4px 10px; background: none; cursor: pointer; }
@@ -149,13 +153,7 @@
 <div id="app">
   <div class="header">
     <h1>💰 Budget</h1>
-    <div style="display:flex;gap:8px;align-items:center;">
-      <div class="who-toggle">
-        <button class="active" id="wb1" onclick="setWho(1)">Adrienne</button>
-        <button id="wb2" onclick="setWho(2)">Wing</button>
-      </div>
-      <button class="gear" onclick="openSettings()">⚙️</button>
-    </div>
+    <button class="gear" onclick="openSettings()">⚙️</button>
   </div>
 
   <div class="totals">
@@ -184,6 +182,12 @@
     <div class="section-head">
       <h2>Recent</h2>
       <button class="refresh-btn" onclick="loadEntries()">↻ Refresh</button>
+    </div>
+    <div class="filter-bar">
+      <button class="filter-pill active" data-filter="all" onclick="setFilter(this,'all')">All</button>
+      <button class="filter-pill" data-filter="household" onclick="setFilter(this,'household')">🛒 Household</button>
+      <button class="filter-pill" data-filter="coffee" onclick="setFilter(this,'coffee')">☕ Coffee</button>
+      <button class="filter-pill" data-filter="airbnb" onclick="setFilter(this,'airbnb')">🏠 Airbnb</button>
     </div>
     <div class="entry-list" id="recent-list"><div class="empty-state">Add your first entry above</div></div>
   </div>
@@ -425,17 +429,28 @@ function entryHTML(r, realIndex) {
   </div>`;
 }
 
+let activeFilter = 'all';
+
+function setFilter(btn, filter) {
+  activeFilter = filter;
+  document.querySelectorAll('.filter-pill').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderRecent();
+  renderAll();
+}
+
 function renderRecent() {
   const el = document.getElementById('recent-list');
   const total = cachedRows.length;
-  const rows = cachedRows.slice(-10).reverse();
-  el.innerHTML = rows.length ? rows.map((r, i) => entryHTML(r, total - 1 - i)).join('') : '<div class="empty-state">No entries yet</div>';
+  const filtered = cachedRows.map((r,i) => ({r,i})).filter(({r}) => activeFilter === 'all' || r[4] === activeFilter);
+  const rows = filtered.slice(-20).reverse();
+  el.innerHTML = rows.length ? rows.map(({r,i}) => entryHTML(r, i)).join('') : '<div class="empty-state">No entries</div>';
 }
 
 function renderAll() {
   const el = document.getElementById('all-list');
-  const total = cachedRows.length;
-  el.innerHTML = total ? cachedRows.slice().reverse().map((r, i) => entryHTML(r, total - 1 - i)).join('') : '<div class="empty-state">No entries yet</div>';
+  const filtered = cachedRows.map((r,i) => ({r,i})).filter(({r}) => activeFilter === 'all' || r[4] === activeFilter);
+  el.innerHTML = filtered.length ? filtered.slice().reverse().map(({r,i}) => entryHTML(r, i)).join('') : '<div class="empty-state">No entries</div>';
 }
 
 async function deleteRow(index) {
