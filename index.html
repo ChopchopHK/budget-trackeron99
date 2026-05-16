@@ -90,10 +90,13 @@
   .dot.airbnb { background: var(--airbnb); }
   .dot.household { background: var(--household); }
   .entry-info { flex: 1; min-width: 0; }
-  .entry-cat { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .entry-cat { font-size: 13px; font-weight: 600; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
   .entry-meta { font-size: 11px; color: var(--muted); margin-top: 1px; }
   .entry-amt { font-size: 15px; font-weight: 800; flex-shrink: 0; }
   .empty-state { text-align: center; padding: 2.5rem 1rem; color: var(--muted); font-size: 14px; }
+
+  .rec-cc-btn { flex:1; padding:10px 4px; border:1.5px solid var(--border); border-radius:12px; font-size:12px; font-weight:700; background:transparent; cursor:pointer; color:var(--muted); }
+  .rec-cc-btn.active { background:var(--text); border-color:var(--text); color:#fff; }
 
   .rec-wrap { padding: 0 1rem; }
   .rec-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 1rem; margin-bottom: 10px; }
@@ -201,17 +204,23 @@
   </div>
 
   <div class="tab-panel" id="tab-reconcile">
-    <div class="section-head"><h2>Monthly reconcile</h2></div>
+    <div class="section-head"><h2>Month end</h2></div>
     <div class="rec-wrap">
       <div class="rec-card">
-        <span class="fl">CC statement total (£)</span>
-        <input type="number" id="cc-total" placeholder="0.00" step="0.01" />
-        <span class="fl" style="margin-top:12px;">Bank pot balance (£)</span>
-        <input type="number" id="bank-bal" placeholder="0.00" step="0.01" />
-        <button class="big-btn" style="margin-top:12px;" onclick="reconcile()">Calculate</button>
-        <div class="rec-grid" id="rec-grid" style="display:none;"></div>
+        <span class="fl">Which CC are you closing?</span>
+        <div style="display:flex;gap:8px;margin-top:6px;">
+          <button class="rec-cc-btn active" id="rcc-amex" onclick="pickCC(this,'amex')">Amex Platinum</button>
+          <button class="rec-cc-btn" id="rcc-barclays" onclick="pickCC(this,'barclays')">Barclays</button>
+          <button class="rec-cc-btn" id="rcc-biz" onclick="pickCC(this,'biz')">Amex Business</button>
+        </div>
+        <span class="fl" style="margin-top:16px;">CC Balance (£)</span>
+        <input type="number" id="rec-cc-amount" placeholder="0.00" step="0.01" style="width:100%;padding:11px 12px;border:1px solid var(--border);border-radius:10px;font-size:18px;font-weight:600;background:var(--bg);color:var(--text);margin-top:6px;" />
+        <div id="rec-preview" style="margin-top:12px;font-size:13px;color:var(--muted);min-height:20px;"></div>
+        <button class="big-btn" style="margin-top:12px;" onclick="saveReconcile()">Save to Sheet</button>
       </div>
-      <div style="font-size:12px;color:var(--muted);line-height:1.6;">CC statement = source of truth. Gap = what you missed logging. Pot = what's left after paying CC.</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.6;margin-top:8px;">
+        Saves to Sheet2. One row per month, updates as each CC is logged.
+      </div>
     </div>
   </div>
 
@@ -486,19 +495,146 @@ async function deleteRow(index) {
   }
 }
 
-function reconcile() {
-  const cc = parseFloat(document.getElementById('cc-total').value) || 0;
-  const bank = parseFloat(document.getElementById('bank-bal').value) || 0;
-  const logged = cachedRows.reduce((s, r) => s + (parseFloat(r[3]) || 0), 0);
-  const gap = cc - logged;
-  const pot = bank - cc;
-  const grid = document.getElementById('rec-grid');
-  grid.style.display = 'grid';
-  grid.innerHTML = `
-    <div class="rec-item"><div class="rl">You logged</div><div class="rv">£${logged.toFixed(2)}</div></div>
-    <div class="rec-item"><div class="rl">CC statement</div><div class="rv">£${cc.toFixed(2)}</div></div>
-    <div class="rec-item"><div class="rl">Gap (missed)</div><div class="rv ${gap>0?'neg':'pos'}">£${Math.abs(gap).toFixed(2)} ${gap>0?'under':'over'}</div></div>
-    <div class="rec-item"><div class="rl">Pot remaining</div><div class="rv ${pot>=0?'pos':'neg'}">£${pot.toFixed(2)}</div></div>`;
+// ─── RECONCILE ────────────────────────────────────────────────────────────────
+let selectedCC = 'amex';
+
+function pickCC(btn, cc) {
+  selectedCC = cc;
+  document.querySelectorAll('.rec-cc-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  updateRecPreview();
+}
+
+function updateRecPreview() {
+  const amt = parseFloat(document.getElementById('rec-cc-amount').value) || 0;
+  const householdTotal = cachedRows.filter(r => r[4] === 'household').reduce((s,r) => s + (parseFloat(r[3])||0), 0);
+  const bizTotal = cachedRows.filter(r => r[4] === 'coffee' || r[4] === 'airbnb').reduce((s,r) => s + (parseFloat(r[3])||0), 0);
+  const manual = selectedCC === 'biz' ? bizTotal : householdTotal;
+  const diff = amt > 0 ? (amt - manual).toFixed(2) : '—';
+  const sign = parseFloat(diff) > 0 ? '+' : '';
+  document.getElementById('rec-preview').innerHTML = amt > 0
+    ? `Manual balance: <strong>£${manual.toFixed(2)}</strong> · Difference: <strong>${sign}£${diff}</strong>`
+    : '';
+}
+
+document.getElementById('rec-cc-amount').addEventListener('input', updateRecPreview);
+
+async function saveReconcile() {
+  const amt = parseFloat(document.getElementById('rec-cc-amount').value);
+  if (!amt || amt <= 0) { showToast('Enter the CC balance'); return; }
+
+  const householdTotal = cachedRows.filter(r => r[4] === 'household').reduce((s,r) => s + (parseFloat(r[3])||0), 0);
+  const bizTotal = cachedRows.filter(r => r[4] === 'coffee' || r[4] === 'airbnb').reduce((s,r) => s + (parseFloat(r[3])||0), 0);
+
+  const today = new Date();
+  const monthKey = today.toLocaleDateString('en-GB', { month:'short', year:'numeric' }); // e.g. "May 2026"
+  const dateStr = today.toLocaleDateString('en-GB', { day:'2-digit', month:'2-digit', year:'2-digit' });
+
+  const btn = document.querySelector('.big-btn');
+  btn.textContent = 'Saving…'; btn.style.opacity = '0.6';
+
+  try {
+    const token = await getToken();
+    const tab2 = 'Sheet2';
+
+    // Read existing Sheet2 rows to find if this month already has a row
+    const range = encodeURIComponent(tab2 + '!A:I');
+    const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${CFG.sid}/values/${range}`, {
+      headers: { Authorization: 'Bearer ' + token }
+    });
+    const data = await res.json();
+    const rows = data.values || [];
+
+    // Find row index for this month (col A = date, we match month+year)
+    let rowIndex = -1;
+    for (let i = 1; i < rows.length; i++) {
+      const d = rows[i][0] || '';
+      // Parse stored date to check same month/year
+      const parts = d.split('/');
+      if (parts.length === 3) {
+        const rowDate = new Date(`20${parts[2]}`, parts[1]-1, parts[0]);
+        if (rowDate.getMonth() === today.getMonth() && rowDate.getFullYear() === today.getFullYear()) {
+          rowIndex = i;
+          break;
+        }
+      }
+    }
+
+    // Get sheet metadata for Sheet2 sheetId
+    const meta = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${CFG.sid}?fields=sheets.properties`, {
+      headers: { Authorization: 'Bearer ' + token }
+    });
+    const metaData = await meta.json();
+    const sheet2 = metaData.sheets.find(s => s.properties.title === tab2);
+    const sheet2Id = sheet2 ? sheet2.properties.sheetId : 1;
+
+    if (rowIndex === -1) {
+      // No row for this month — create new row
+      // Columns: A=Date, B=Amex Platinum, C=Barclays, D=CC Total, E=Household Logs, F=Household Diff, G=Amex Business, H=Business Logs, I=Biz Diff
+      const newRow = [dateStr, '', '', '', householdTotal.toFixed(2), '', '', bizTotal.toFixed(2), ''];
+      if (selectedCC === 'amex') newRow[1] = amt.toFixed(2);
+      if (selectedCC === 'barclays') newRow[2] = amt.toFixed(2);
+      if (selectedCC === 'biz') newRow[6] = amt.toFixed(2);
+      recalcRow(newRow);
+      await appendToSheet2(token, tab2, newRow);
+    } else {
+      // Row exists — update the specific cell
+      const existing = rows[rowIndex];
+      while (existing.length < 9) existing.push('');
+      if (selectedCC === 'amex') existing[1] = amt.toFixed(2);
+      if (selectedCC === 'barclays') existing[2] = amt.toFixed(2);
+      if (selectedCC === 'biz') existing[6] = amt.toFixed(2);
+      existing[4] = householdTotal.toFixed(2);
+      existing[7] = bizTotal.toFixed(2);
+      recalcRow(existing);
+      // Write back the full row
+      const updateRange = encodeURIComponent(tab2 + '!A' + (rowIndex + 1) + ':I' + (rowIndex + 1));
+      await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${CFG.sid}/values/${updateRange}?valueInputOption=USER_ENTERED`, {
+        method: 'PUT',
+        headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ values: [existing] })
+      });
+    }
+
+    document.getElementById('rec-cc-amount').value = '';
+    document.getElementById('rec-preview').innerHTML = '';
+    showToast('✓ Saved to Sheet2');
+  } catch(e) {
+    showToast('Error: ' + e.message.slice(0,60));
+  } finally {
+    btn.textContent = 'Save to Sheet'; btn.style.opacity = '1';
+  }
+}
+
+function recalcRow(row) {
+  // CC Total (D) = Amex Platinum (B) + Barclays (C) — pending if either missing
+  const amex = parseFloat(row[1]) || 0;
+  const barc = parseFloat(row[2]) || 0;
+  const hasAmex = row[1] !== '' && row[1] !== undefined;
+  const hasBarc = row[2] !== '' && row[2] !== undefined;
+  if (hasAmex && hasBarc) {
+    row[3] = (amex + barc).toFixed(2);
+    row[5] = (amex + barc - parseFloat(row[4]||0)).toFixed(2);
+  } else {
+    row[3] = 'pending';
+    // Still calc partial diff
+    const partialCC = hasAmex ? amex : (hasBarc ? barc : 0);
+    row[5] = partialCC > 0 ? (partialCC - parseFloat(row[4]||0)).toFixed(2) : 'pending';
+  }
+  // Biz diff
+  const biz = parseFloat(row[6]) || 0;
+  const hasBiz = row[6] !== '' && row[6] !== undefined;
+  row[8] = hasBiz ? (biz - parseFloat(row[7]||0)).toFixed(2) : 'pending';
+}
+
+async function appendToSheet2(token, tab2, row) {
+  const range = encodeURIComponent(tab2 + '!A:I');
+  const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${CFG.sid}/values/${range}:append?valueInputOption=USER_ENTERED`, {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ values: [row] })
+  });
+  if (!res.ok) throw new Error(await res.text());
 }
 
 // ─── SHEETS AUTH ──────────────────────────────────────────────────────────────
