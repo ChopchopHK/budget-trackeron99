@@ -279,9 +279,6 @@ function saveConfig() {
 
 function applyConfig() {
   whoIndex = CFG.myIdx || 1;
-  document.getElementById('wb1').textContent = 'Adrienne';
-  document.getElementById('wb2').textContent = 'Wing';
-  updateWhoButtons();
 }
 
 function openSettings() {
@@ -294,11 +291,8 @@ function openSettings() {
   document.getElementById('config-screen').style.display = 'flex';
 }
 
-function setWho(n) { whoIndex = n; updateWhoButtons(); }
-function updateWhoButtons() {
-  document.getElementById('wb1').classList.toggle('active', whoIndex === 1);
-  document.getElementById('wb2').classList.toggle('active', whoIndex === 2);
-}
+function setWho(n) { whoIndex = n; }
+function updateWhoButtons() {}
 function whoName() { return whoIndex === 1 ? 'Adrienne' : 'Wing'; }
 
 // ─── CATEGORY DETECTION ───────────────────────────────────────────────────────
